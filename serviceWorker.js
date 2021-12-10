@@ -1,5 +1,5 @@
 const CACHE_NAME = 'v1_cafeteria';
-const assets = [
+const contentToCache = [
   "/",
   "index.html",
   "css/style.css",
@@ -15,16 +15,15 @@ const assets = [
   "images/coffee9.jpg"
 ];
 
-self.addEventListener('install', e => {
+self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache)
-          .then(() => self.skipWaiting())
-      })
-      .catch(err => console.log('Falló registro de cache', err))
-  )
-})
+    caches.open(CACHE_NAME).then((cache) => {
+          console.log('[Servicio Worker] Almacena todo en caché: contenido e intérprete de la aplicación');
+      return cache.addAll(contentToCache);
+    })
+    .catch(err => console.log('Falló registro de cache', err))
+  );
+});
 
 //una vez que se instala el SW, se activa y busca los recursos para hacer que funcione sin conexión
 self.addEventListener('activate', e => {
@@ -47,21 +46,18 @@ self.addEventListener('activate', e => {
   )
 })
 
-//cuando el navegador recupera una url
-self.addEventListener('fetch', e => {
-  //Responder ya sea con el objeto en caché o continuar y buscar la url real
+//Encuentra recurso en la caché y si no lo vuelve a solicitar a la red
+self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request)
-      .then(res => {
-        if (res) {
-          //recuperar del cache
-          return res
-        }
-        //recuperar de la petición a la url
-        return fetch(e.request)
-      })
-  )
-})
-
-
-
+    caches.match(e.request).then((r) => {
+          console.log('[Servicio Worker] Obteniendo recurso: '+e.request.url);
+      return r || fetch(e.request).then((response) => {
+                return caches.open(CACHE_NAME).then((cache) => {
+          console.log('[Servicio Worker] Almacena el nuevo recurso: '+e.request.url);
+          cache.put(e.request, response.clone());
+          return response;
+        });
+      });
+    })
+  );
+});
